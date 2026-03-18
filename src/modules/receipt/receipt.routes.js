@@ -6,7 +6,8 @@ const { authMiddleware } = require('../../common/middleware/auth.middleware');
 const { validate } = require('../../common/middleware/validate.middleware');
 const { confirmReceiptItemsSchema } = require('./receipt.validation');
 
-const upload = multer({ dest: 'uploads/' }); // In production use S3/Firebase Storage
+const os = require('os');
+const upload = multer({ dest: os.tmpdir() }); // In production use S3/Firebase Storage
 
 router.use(authMiddleware);
 
