@@ -1,0 +1,44 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Project specific
+uploads/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!flovarspark-5cb211e5d677.json  # Note: You should probably ignore this but I will leave it for now or explicitly ignore it if it's a secret.
+# Re-evaluating: flovarspark-5cb211e5d677.json is a GCP credential file. It MUST be ignored.
+flovarspark-5cb211e5d677.json
+
+# IDEs
+.vscode/
+.idea/
+
+# Prisma
+/prisma/migrations/
+/prisma/*.db
+/prisma/*.db-journal
+
+# Next.js / Build outputs
+.next/
+out/
+dist/
+build/

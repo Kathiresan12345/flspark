@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PantrySource {
+  manual
+  receipt
+  ai_inferred
+}
+
+enum ReceiptProcessingStatus {
+  uploaded
+  processing
+  completed
+  failed
+}
+
+enum RecipeSource {
+  spoonacular
+  ai_generated
+  internal
+}
+
+enum MealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
+enum NotificationType {
+  expiry_alert
+  meal_reminder
+  shopping_reminder
+  system
+}
+
+model User {
+  id             String         @id @default(uuid())
+  firebaseUid    String         @unique @map("firebase_uid")
+  email          String         @unique
+  name           String?
+  dietPreference String?        @map("diet_preference")
+  allergies      Json?
+  householdSize  Int            @default(1) @map("household_size")
+  pantryItems    PantryItem[]
+  receipts       Receipt[]
+  mealPlans      MealPlan[]
+  shoppingLists  ShoppingList[]
+  notifications  Notification[]
+  deviceTokens   DeviceToken[]
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model PantryItem {
+  id             String       @id @default(uuid())
+  userId         String       @map("user_id")
+  itemName       String       @map("item_name")
+  normalizedName String       @map("normalized_name")
+  category       String?
+  quantity       Decimal?
+  unit           String?
+  expiryDate     DateTime?    @db.Date @map("expiry_date")
+  source         PantrySource @default(manual)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([normalizedName])
+  @@map("pantry_items")
+}
+
+model Receipt {
+  id               String                  @id @default(uuid())
+  userId           String                  @map("user_id")
+  imageUrl         String                  @map("image_url")
+  ocrRawText       String?                 @map("ocr_raw_text")
+  processingStatus ReceiptProcessingStatus @default(uploaded) @map("processing_status")
+  errorMessage     String?                 @map("error_message")
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            ReceiptItem[]
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id              String    @id @default(uuid())
+  receiptId       String    @map("receipt_id")
+  itemName        String    @map("item_name")
+  normalizedName  String?   @map("normalized_name")
+  quantity        Decimal?
+  unit            String?
+  category        String?
+  confidenceScore Decimal?  @map("confidence_score")
+  isConfirmed     Boolean   @default(false) @map("is_confirmed")
+  receipt         Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([receiptId])
+  @@map("receipt_items")
+}
+
+model Recipe {
+  id                String      @id @default(uuid())
+  externalId        String?     @map("external_id")
+  source            RecipeSource
+  title             String
+  description       String?
+  ingredients       Json
+  instructions      String
+  cookingTimeMin    Int?        @map("cooking_time_minutes")
+  difficultyLevel   String?     @map("difficulty_level")
+  imageUrl          String?     @map("image_url")
+  nutritionData     Json?       @map("nutrition_data")
+  mealPlans         MealPlan[]
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@map("recipes")
+}
+
+model RecipeCache {
+  id              String   @id @default(uuid())
+  ingredientHash  String   @unique @map("ingredient_hash")
+  responsePayload Json     @map("response_payload")
+  source          String
+  expiresAt       DateTime @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([ingredientHash])
+  @@map("recipe_cache")
+}
+
+model MealPlan {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  planDate   DateTime @db.Date @map("plan_date")
+  mealType   MealType @map("meal_type")
+  recipeId   String   @map("recipe_id")
+  servings   Int      @default(1)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, planDate])
+  @@map("meal_plans")
+}
+
+model ShoppingList {
+  id         String             @id @default(uuid())
+  userId     String             @map("user_id")
+  title      String             @default("Default Shopping List")
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      ShoppingListItem[]
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("shopping_lists")
+}
+
+model ShoppingListItem {
+  id             String       @id @default(uuid())
+  shoppingListId String       @map("shopping_list_id")
+  itemName       String       @map("item_name")
+  normalizedName String?      @map("normalized_name")
+  quantity       Decimal?
+  unit           String?
+  category       String?
+  isPurchased    Boolean      @default(false) @map("is_purchased")
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([shoppingListId])
+  @@map("shopping_list_items")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String           @map("user_id")
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false) @map("is_read")
+  sentAt     DateTime?        @map("sent_at")
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  fcmToken   String   @unique @map("fcm_token")
+  platform   String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("device_tokens")
+}
