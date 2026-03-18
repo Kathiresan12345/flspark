@@ -4,6 +4,27 @@ const prisma = require('../../config/database');
 const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const devUid = req.headers['x-dev-uid'];
+
+    // Development Bypass
+    if (process.env.NODE_ENV === 'development' && devUid) {
+      let user = await prisma.user.findUnique({
+        where: { firebaseUid: devUid },
+      });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            firebaseUid: devUid,
+            email: `${devUid}@example.com`,
+            name: null,
+          },
+        });
+      }
+      req.user = user;
+      return next();
+    }
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
