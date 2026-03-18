@@ -16,6 +16,15 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root Route
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'Welcome to FlavorSpark API', 
+    status: 'OK', 
+    documentation: 'See README for API endpoints' 
+  });
+});
+
 // Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
