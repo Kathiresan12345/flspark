@@ -1,5 +1,8 @@
 const admin = require('../../config/firebase');
 const prisma = require('../../config/database');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -34,6 +37,24 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+    
+    // 1. Try to verify as Custom JWT (for email/password users)
+    try {
+      const decodedJwt = jwt.verify(token, JWT_SECRET);
+      const user = await prisma.user.findUnique({
+        where: { id: decodedJwt.userId },
+      });
+      
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    } catch (jwtError) {
+      // If JWT verification fails, fall through to Firebase verification
+      // Ignore jwtError as it might just mean it's a Firebase token
+    }
+
+    // 2. Try to verify as Firebase Token (for Google/Apple logins)
     const decodedToken = await admin.auth().verifyIdToken(token);
     
     // Find or sync user in local database
@@ -42,11 +63,6 @@ const authMiddleware = async (req, res, next) => {
     });
 
     if (!user) {
-      // Small optimization: if user doesn't exist, we might want to create them
-      // but usually /api/auth/sync-user handles this.
-      // For now, if user doesn't exist in our DB but has a valid Firebase token,
-      // we can either return an error or auto-create.
-      // Decided: Auto-create basic profile to avoid friction.
       user = await prisma.user.create({
         data: {
           firebaseUid: decodedToken.uid,
